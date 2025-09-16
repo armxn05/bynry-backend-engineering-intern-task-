@@ -1,0 +1,31 @@
+Questions / Gaps to ask the product team : 
+
+1. Threshold rule granularity
+Is low_stock_threshold per product, per product+warehouse, or per product type? Should warehouses override product-level thresholds?
+
+2. Definition of "recent sales activity"
+How many days should "recent" cover (30/60/90)? Does this include pending orders?
+
+3. Units & conversions
+Are there units of measure and conversions (kg, piece, box)? Are BOMs needed?
+
+4. Multi-tenancy / ownership
+Can multiple companies share the same product entry (same SKU)? Or is every product created by a company? (We assumed SKU global.)
+
+5. Reservations & backorders
+Should reserved stock / fulfilling orders reduce available stock? How to treat allocated vs available?
+
+6. Transfers between warehouses
+Should we model transfers as inventory_movements(reason='transfer')? Any special rules?
+
+7. Supplier selection rules
+How to pick supplier for reordering (cheapest vs preferred vs shortest lead time)?
+
+8. Perishable / lot / serial tracking
+Do we need batch/lot/expiry tracking or serialized inventory?
+
+9. Currency & pricing
+Multi-currency support? Pricing per company or global?
+
+10. Performance SLAs
+Expected scale (#products, #warehouses, read/writes per minute)? This affects indexing and partitioning choices.

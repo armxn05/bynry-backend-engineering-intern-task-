@@ -1,0 +1,68 @@
+Code Review and Debugging
+
+
+Original Code :
+
+@app.route('/api/products', methods=['POST'])
+def create_product():
+    data = request.json
+    
+    # Create new product
+    product = Product(
+        name=data['name'],
+        sku=data['sku'],
+        price=data['price'],
+        warehouse_id=data['warehouse_id']
+    )
+    
+    db.session.add(product)
+    db.session.commit()
+    
+    # Update inventory count
+    inventory = Inventory(
+        product_id=product.id,
+        warehouse_id=data['warehouse_id'],
+        quantity=data['initial_quantity']
+    )
+    
+    db.session.add(inventory)
+    db.session.commit()
+    
+    return {"message": "Product created", "product_id": product.id}
+
+
+
+Issues and impacts :
+
+Multiple commits / lack of atomic transaction
+	Issue: The code commits the product, then separately commits inventory. If the inventory creation fails (DB error, validation, network), the product will exist 	without an inventory row — inconsistent state.
+	Impact: Partial writes; UI/clients may see product but no stock; reconciliation becomes hard.
+
+2. SKU uniqueness not enforced / no error handling for duplicate SKU
+	Issue: No unique constraint handling; no handling of IntegrityError.
+	Impact: Duplicate SKUs may be created (DB may still enforce uniqueness if present but code doesn't handle the resulting exception), leading to corrupted catalog 	and downstream lookup failures.
+
+3. Price handling (floats vs Decimal) 
+	Issue: Uses price=data['price'] directly. If price comes as float, floating-point precision can break money calculations.
+	Impact: Rounding errors, billing/inventory valuation inaccuracies.
+
+4. No validation of required fields or optionality
+	Issue: Assumes data['name'], data['sku'], data['warehouse_id'], data['initial_quantity'], and data['price'] exist and are valid.
+	Impact: KeyError if a field missing; bad inputs create invalid DB rows; crashes.
+
+5. Inventory duplicate rows
+	Issue: If an inventory row for (product, warehouse) already exists, code unconditionally creates a new Inventory row.
+	Impact: Duplicate inventory entries for same product/warehouse — reporting and stock calculations break.
+
+6. No concurrency handling
+	Issue: When multiple requests create inventory for the same product/warehouse concurrently, race conditions can create duplicates or lost updates.
+	Impact: Stock counts become incorrect.
+
+7.Wrong model usage / misplaced field (warehouse_id on Product)
+	Issue: Product is probably global (or owned by company), while warehouse_id is an inventory concept. Setting warehouse_id on Product is suspicious.
+	Impact: Modeling confusion; product tied to one warehouse incorrectly.
+
+8. Bad HTTP semantics and responses
+	Issue: Always returns 200 with JSON but no error codes or descriptive errors.
+	Impact: Clients cannot easily handle errors (should be 201 for created, 400/409/404 for problems).
+

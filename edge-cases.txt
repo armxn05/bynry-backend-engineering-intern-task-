@@ -1,0 +1,18 @@
+Edge cases & how code handles them
+
+-No recent sales for a product — not included in alerts (per rule).
+-Zero average daily sales / tiny sales rates — days_until_stockout = ceil(current_stock / avg_daily_sales); if avg_daily_sales == 0 we exclude.
+-No supplier found — supplier set to null in output; recommending to expose "suggested suppliers" from procurement UI.
+-Products that are bundles — this logic treats bundles as products; for bundle stockouts one might need to compute available bundles from component inventories. (This is a known gap: see Questions in Part 2.)
+-Large data sets — current code loads results into memory. For production: paginate or stream; use optimized SQL queries with lateral joins to compute supplier selection in the DB.
+-Time window choice — configurable via days_window query param; defaults to 90.
+
+
+
+
+Performance & scaling notes (recommendations)
+
+-Add appropriate DB indexes: order_items(product_id), sales_orders(warehouse_id, created_at, status), inventories(product_id, warehouse_id).
+-For heavy traffic, compute low-stock alerts in background jobs and cache results. Real-time computation across millions of products is expensive.
+-For supplier selection, precompute preferred_supplier_id on product or maintain a denormalized reorder_info table for fast lookups.
+-Avoid N+1 queries: current code makes a second query to fetch suppliers; prefer a single query with grouping or lateral joins for high scale.
